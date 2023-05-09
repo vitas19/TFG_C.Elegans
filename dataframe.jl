@@ -3,7 +3,7 @@ using CSV
 using XLSX
 
 
-data_connect_phar = CSV.read("CONEXIONESPHARINGEAL.csv", DataFrame)
+data_connect_phar = CSV.read("RawData/CONEXIONESPHARINGEAL.csv", DataFrame)
 """
 Sending: Name of sending neuron
 Receiving: Name of receiving neuron
@@ -12,7 +12,7 @@ Type: Type of synapse: S: synaptic; G: gap.
 """
 
 
-data_connect_neuron = DataFrame(XLSX.readtable("NeuronConnect.xlsx", "Sheet1"))
+data_connect_neuron = DataFrame(XLSX.readtable("RawData/NeuronConnect.xlsx", "Sheet1"))
 """
 N1: Neuron 1 name
 N2: Neuron 2 name
@@ -31,7 +31,7 @@ It must be noted that at polyadic synaptic sites, not all “send-poly” were f
 Nbr: Number of synapses between the given neuron pair.
 """
 
-data_type_neuron = DataFrame(XLSX.readtable("NeuronType.xlsx", "Sheet1"))
+data_type_neuron = DataFrame(XLSX.readtable("RawData/NeuronType.xlsx", "Sheet1"))
 """
 Neuron: Name of neuron
 Soma Position: Position of cell body along the AP axis of worm body. 0=tip of nose; 1=tail tip.
@@ -64,7 +64,7 @@ Note:  Sum of S_Head and R_Head does not include electrical junctions (EJ), ther
 """
 
 
-data_type_phar = DataFrame(XLSX.readtable("NeuronType.xlsx", "Sheet2"))
+data_type_phar = DataFrame(XLSX.readtable("RawData/NeuronType.xlsx", "Sheet2"))
 """
 Neuron: Name of neuron
 Soma Position: Position of cell body along the AP axis of worm body. 0=tip of nose; 1=tail tip.
