@@ -1,6 +1,7 @@
 using DataFrames
 using CSV
 using XLSX
+using LinearAlgebra
 
 
 data_connect_phar = CSV.read("RawData/CONEXIONESPHARINGEAL.csv", DataFrame)
@@ -71,14 +72,30 @@ Soma Position: Position of cell body along the AP axis of worm body. 0=tip of no
 Soma region: Cell body position by head, mid-body, or tail region.
 """
 
+data_connect_monoamine = CSV.read("RawData/MonoaminesConnect.csv", DataFrame)
+"""
+Neuron1: Name of sending neuron
+Neuron2: Name of receiving neuron
+Type: Name of the monoamine
+Monoamine: MA stands for monoamine
+Specific: The specific type of monoamine
+"""
+
+
+
+
 """ IMPORTANT VARIABLES:
 data_connect_phar
 data_connect_neuron
 data_type_neuron
-data_type_phar"""
+data_type_phar
+data_connect_monoamine"""
+
+
+
 
 # DATAFRAMES CLEANING
-
+# GAP AND SYNAPTIC
 # From all the dataframe of data_type_neuron only select the first three columns
 data_type_neuron = data_type_neuron[:, 1:3]
 # Concatenate the two dataframes about neuron type
@@ -108,7 +125,7 @@ data_connect = data_connect[data_connect.Type .!= "Rp", :]
 data_connect = data_connect[data_connect.Type .!= "NMJ", :]
 
 
-# TRANSFORM THE CONNECTIONS FROM NEURON NAMES TO NUMBERS
+# TRANSFORM THE CONNECTIONS FROM NEURON NAMES TO NUMBERS FOR GAP AND SYNAPTIC
 # Create a new dictionary to append the indexes
 data_index = DataFrame(IndexSending=Any[], IndexReceiving=Any[])
 # Create two vectors to store the indeces before appending
@@ -139,6 +156,35 @@ data_connect_synaptic = vcat(data_connect_S, data_connect_Sp)
 data_connect_G = data_connect[data_connect.Type .== "G", :]
 data_connect_EJ = data_connect[data_connect.Type .== "EJ", :]
 data_connect_gap = vcat(data_connect_G, data_connect_EJ)
+
+
+
+# DATAFRAMES CLEANING
+# MONOAMINES AND NUEROPEPTIDES
+# From all the dataframe of data_type_neuron only select the first three columns
+data_connect_monoamine = data_connect_monoamine[:, 1:3]
+
+# TRANSFORM THE CONNECTIONS FROM NEURON NAMES TO NUMBERS FOR MONOAMINES
+# Create a new dictionary to append the indexes
+data_index_mono = DataFrame(IndexSending=Any[], IndexReceiving=Any[])
+# Create two vectors to store the indeces before appending
+sending_value_mono = Vector{Int64}()
+receiving_value_mono = Vector{Int64}()
+i = 1
+for row in eachrow(data_connect_monoamine)
+    for value in eachrow(data_type_sort_soma)
+        if row[:Neuron1] == value[:Neuron]
+            append!(sending_value_mono, value[:Place])
+        end
+        if row[:Neuron2] == value[:Neuron]
+            append!(receiving_value_mono, value[:Place])
+        end    
+    end
+    push!(data_index_mono, (sending_value_mono[i], receiving_value_mono[i]))
+    i = i+1
+end
+# Concatenate horizontally the dictionary of data_connect and indeces
+data_connect_monoamine = hcat(data_connect_monoamine, data_index_mono)
 
 
 " IMPORTANT VARIABLES:
@@ -174,17 +220,111 @@ spy(gap_connections, plot_title= "Gap connections among neurons", xlabel = "Neur
 xticks!(1:50:302)
 yticks!(1:50:302)
 
+# Monoamines
+mono_connections_tyr = zeros(302,302)
+mono_connections_oct = zeros(302,302)
+mono_connections_dop = zeros(302,302)
+mono_connections_ser = zeros(302,302)
+for link in eachrow(data_connect_monoamine)
+    from_index = link[:IndexSending]
+    to_index = link[:IndexReceiving]
+    if link[:Type] == "tyramine"
+        mono_connections_tyr[from_index, to_index] = 1
+    elseif link[:Type] == "octopamine"
+        mono_connections_oct[from_index, to_index] = 1
+    elseif link[:Type] == "dopamine"
+        mono_connections_dop[from_index, to_index] = 1
+    elseif link[:Type] == "serotonin"
+        mono_connections_ser[from_index, to_index] = 1
+    end
+end
+spy(mono_connections_tyr, color = :orange, plot_title= "Monoamine connections among neurons", xlabel = "Neuron index", ylabel = "Neuron index")
+spy!(mono_connections_oct, color = :red)
+spy!(mono_connections_dop, color = :green)
+spy!(mono_connections_ser, color = :blue)
+xticks!(1:50:302)
+yticks!(1:50:302)
+
 
 
 # Set variables
+N = 302 # number of neurons
 E_rev = -65.0 #mV Reversal potential of the synapse
 spikeThresh = 0 #mV Spiking threshold
 specific_capacitance = 1 #uF/cm2
 intracellular_resistivity = 0.03 #kΩ*cm
+g = 100 #pS Conductance (Varshney et al., 2011)
+Gc = 10 #pS Cell membrane conductance 
+C = 1.5 #pF Membrane capacitance (Varshney et al., 2011)
+Ecell = -35.0 #mV Leakage potential 
+#while reversal potential E_j = 0mV for excitatory synapses and −48 mV for inhibitory synapses (Wicks et al., 1996). For the synaptic activity variable, we take ar=11.5, ad=51.5 and width of the sigmoid β = 0.125mV−1 (Wicks et al., 1996). Also for the initial condition of the membrane voltages V and synaptic activity variable s, we sample the normal distribution of μ = 0 and σ = 0.94 with size 279 * 2 (for both V and s) and multiply by 10−4
+C = 0.015 # Cell Membrane Capacitance
+ar = 1/1.5
+ad = 5/1.5
 
-
+"""
+Threshold potential for each neuron is computed by imposing dVi/dt=0 (Equation 2 for C. elegans) and solving for Vi. This is equivalent to Solving the following system of linear equations
+Ax=b
+(11)
+A=M1+M2+M3; b=−b1−b3−Iext,
+(12)
+where the solution x is N × 1 vector with each entry being the threshold potential Vthreshold for the ith neuron.
+M1 is a matrix of size N × N where N is the number of neurons (279 for C. elegans) with its diagonal terms populated with −Gc (cell membrane capacitance).
+M2 is a diagonal matrix where diagonal term in ith row corresponds to −∑jGgij i.e., the sum of total conductivity of gap junctions for the ith neuron.
+M3 is a diagonal matrix where its ith diagonal term corresponds to −∑jseqGsij, where seq=arar+2ad and Gsij is maximum total conductivity of synapses to i from j. Note that seq is obtained by imposing dsidt=0 and synaptic activation Φ = 1/2 in Equation 5.
+b1=Gc∗Ec where Ec is a 1D vector of size N × 1 in which all of its elements are Ec (leakage potential).
+b3=Gs⋅(s∗eqEj) where Ej is a 1D vector of size N × 1 that enlists the directionality of each neuron (0 if excitatory or −48 mV if inhibitory).
+Iext is the input stimuli vector where its ith element determines the input current amplitude for the ith neuron.
+"""
 
 println("----------------------------")
 
+show(data_type_sort_soma[!,:Neuron])
 
-show(data_connect_gap, allrows=true)
+
+"""
+# Ax = b ===> A = M1+M2+M3; b = -b1-b3-Iext
+function threshold_potential_computation()
+    # M1 computation
+    Gc_diag = zeros(302,302)  # diagonal matrix with membrane conductance
+    for i in 1:N
+        Gc_diag[i, i] = Gc
+    end
+    M1 = -Gc_diag
+
+    # M2 computation
+    g_gap = 1.0 # condctance of each gap channel
+    gap_number_cond = g_gap * gap_number  # multiply the conductance of each channel by the number of connections
+    gap_diag_array = sum(gap_number_cond, dims = 2)   # sum of total conductivity for each neuron in its row
+    gap_diag = Diagonal(vec(gap_diag_array))  # diagonal matrix with the values of above
+    M2 = -gap_diag  # minus the above
+
+    # M3 computation
+    g_syn = 1.0 # conductance of each synapsis
+    s_eq = ar / (ar + 2 * ad)
+    synaptic_number_cond = g_syn * synaptic_number
+    mult = s_eq * synaptic_number_cond
+    mult_diag_array = sum(mult, dims = 2)
+    mult_diag = Diagonal(vec(mult_diag_array))
+    M3 = -mult_diag
+
+    # b1 computation
+    Ec = fill(Ecell, N) # 1D vector of size N × 1 in which all of its elements are Ec (leakage potential)
+    b1 = Gc *Ec  # cell membrane conductance * Ec
+
+    # b3 computation
+    #Ej # 1D vector of size N × 1 that enlists the directionality of each neuron (0 if excitatory or −48 mV if inhibitory)
+    b3 = synaptic_number_cond .* (s_eq * Ej)
+
+
+    M = M1 + M2 + M3
+    b = - b1 - b3 # - Iext
+
+end
+
+"""
+
+
+
+
+
