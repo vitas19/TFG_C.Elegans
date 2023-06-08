@@ -2,9 +2,17 @@ using DataFrames
 using CSV
 using XLSX
 using LinearAlgebra
+using ColorSchemes
+using Colors
+using Plots
+using DifferentialEquations
+using ModelingToolkit
+using DiffEqBase
+
+"The following lines extract the data from different files and stores as a dataframe"
 
 
-data_connect_phar = CSV.read("RawData/CONEXIONESPHARINGEAL.csv", DataFrame)
+data_connect_phar = CSV.read("RawData/ConexionsPharyngeal.csv", DataFrame)
 """
 Sending: Name of sending neuron
 Receiving: Name of receiving neuron
@@ -22,7 +30,8 @@ Type: Type of synapse:
     Sp: Send-poly (Neuron 1 is pre-synaptic to more than one postsynaptic partner. Neuron 2 is just one of these post-synaptic neurons); 
     R: Receive or input (Neuron 1 is post-synaptic to Neuron 2); 
     Rp: Receive-poly (Neuron 1 is one of several post-synaptic partners of Neuron 2.); 
-    EJ: Electric junction; NMJ: Neuromuscular junction (only reconstructed NMJ's are represented).
+    EJ: Electric junction; 
+    NMJ: Neuromuscular junction (only reconstructed NMJ's are represented).
 It must be noted that at polyadic synaptic sites, not all “send-poly” were faithfully labeled 
     as such in White et al, 1986. Some pre-synaptic connections were labeled simply as “sends”. 
     Reconciliation of chemical synapses did not previously distinguish between send from send-poly 
@@ -82,6 +91,24 @@ Specific: The specific type of monoamine
 """
 
 
+data_connect_neuropep = CSV.read("RawData/NeuropeptidesConnect.csv", DataFrame)
+"""
+Neuron1: Name of sending neuron
+Neuron2: Name of receiving neuron
+Type1: One neuropeptide
+Type2: Another neuropeptide
+"""
+
+
+neurotransmitter = DataFrame(XLSX.readtable("RawData/Neurotransmitters.xlsx", "Sheet1"))
+"""These tables originate from a set of tables found in Pereira et al., 2015 
+(http://elifesciences.org/content/4/e12432v2), combined with information compiled in Loer & Rand,
+2016 & 2022, WormAtlas, and  from Gendrel et al., 2016 and Serrano-Saiz et al., 2017.						
+
+Neuron: Name of the neuron
+Neurotransmitter1: Main neurotransmitter
+Neurotransmitter2: If the nueron sends another neurotransmitter it is stated here
+"""
 
 
 """ IMPORTANT VARIABLES:
@@ -89,12 +116,14 @@ data_connect_phar
 data_connect_neuron
 data_type_neuron
 data_type_phar
-data_connect_monoamine"""
+data_connect_monoamine
+data_connect_neuropep
+neurotransmitter"""
 
 
 
 
-# DATAFRAMES CLEANING
+"DATAFRAMES CLEANING"
 # GAP AND SYNAPTIC
 # From all the dataframe of data_type_neuron only select the first three columns
 data_type_neuron = data_type_neuron[:, 1:3]
@@ -125,13 +154,14 @@ data_connect = data_connect[data_connect.Type .!= "Rp", :]
 data_connect = data_connect[data_connect.Type .!= "NMJ", :]
 
 
-# TRANSFORM THE CONNECTIONS FROM NEURON NAMES TO NUMBERS FOR GAP AND SYNAPTIC
+"TRANSFORM THE CONNECTIONS FROM NEURON NAMES TO NUMBERS FOR GAP AND SYNAPTIC"
 # Create a new dictionary to append the indexes
 data_index = DataFrame(IndexSending=Any[], IndexReceiving=Any[])
 # Create two vectors to store the indeces before appending
 sending_value = Vector{Int64}()
 receiving_value = Vector{Int64}()
 i = 1
+# Iterate through each row and append to the new dataframe with the sending and receiving value
 for row in eachrow(data_connect)
     for value in eachrow(data_type_sort_soma)
         if row[:Sending] == value[:Neuron]
@@ -159,7 +189,7 @@ data_connect_gap = vcat(data_connect_G, data_connect_EJ)
 
 
 
-# DATAFRAMES CLEANING
+"DATAFRAMES CLEANING"
 # MONOAMINES AND NUEROPEPTIDES
 # From all the dataframe of data_type_neuron only select the first three columns
 data_connect_monoamine = data_connect_monoamine[:, 1:3]
@@ -187,44 +217,115 @@ end
 data_connect_monoamine = hcat(data_connect_monoamine, data_index_mono)
 
 
+
+"TRANSFORM THE CONNECTIONS FROM NEURON NAMES TO NUMBERS FOR MONOAMINES"
+# Create a new dictionary to append the indexes
+data_index_neuropep = DataFrame(IndexSending=Any[], IndexReceiving=Any[])
+# Create two vectors to store the indeces before appending
+sending_value_neuropep = Vector{Int64}()
+receiving_value_neuropep = Vector{Int64}()
+i = 1
+for row in eachrow(data_connect_neuropep)
+    for value in eachrow(data_type_sort_soma)
+        if row[:Neuron1] == value[:Neuron]
+            append!(sending_value_neuropep, value[:Place])
+        end
+        if row[:Neuron2] == value[:Neuron]
+            append!(receiving_value_neuropep, value[:Place])
+        end    
+    end
+    push!(data_index_neuropep, (sending_value_neuropep[i], receiving_value_neuropep[i]))
+    i = i+1
+end
+# Concatenate horizontally the dictionary of data_connect and indeces
+data_connect_neuropep = hcat(data_connect_neuropep, data_index_neuropep)
+
+
 " IMPORTANT VARIABLES:
 data_connect_synaptic
 data_connect_gap
+data_connect_monoamine
+data_connect_neuropep
 "
 
 
-# Plot the number of connections of the synaptic and gap
-synaptic_number = zeros(302, 302)
-synaptic_connections = zeros(302, 302)
+"Plot the number of connections of the synaptic and gap"
+# Create two matrices for storing the connectivity information
+synaptic_number = zeros(302, 302)           # To store the number of connections
+synaptic_connections = zeros(302, 302)      # To store if there is a connection
+# Iterate through the datatframe and add the information to the corresponding point
 for link in eachrow(data_connect_synaptic)
     from_index = link[:IndexSending]
     to_index = link[:IndexReceiving]
     value = link[:Number]
-    synaptic_number[from_index, to_index] = value   
+    synaptic_number[from_index, to_index] = value
     synaptic_connections[from_index, to_index] = 1
 end
-spy(synaptic_number, plot_title= "Number of synaptic connections among neurons", xlabel = "Neuron index", ylabel = "Neuron index")
-spy(synaptic_connections, plot_title= "Synaptic connections among neurons", xlabel = "Neuron index", ylabel = "Neuron index")
+# Plot both matrices
+spy(synaptic_number, plot_title= "Number of synaptic connections among neurons", xlabel = "Sending neuron index", ylabel = "Rceiving neuron index", color=:berlin)
+spy(synaptic_connections, plot_title= "Synaptic connections among neurons", xlabel = "Sending neuron index", ylabel = "Receiving neuron index")
 
+
+# For viewing the infromation of the frequency of the number of connections
+data_s = vec(synaptic_number)           # Flatten the matrix into a 1D array
+data_s = filter(x -> x != 0, data_s)    # Take out the values that are 0 for a true result
+# Generate histogram
+histogram(data_s, bins=:scott, 
+    xticks = unique(data_s), legend = false, normalize=:probability,
+    xlabel = "Values", ylabel = "Frequency", title = "Synaptic histogram")
+histogram!(size=(800,500))
+
+
+
+# Repeat the previous process for GAP junctions
 gap_number = zeros(302, 302)
 gap_connections = zeros(302,302)
 for link in eachrow(data_connect_gap)
     from_index = link[:IndexSending]
     to_index = link[:IndexReceiving]
     value = link[:Number]
-    gap_number[from_index, to_index] = value    
+    gap_number[from_index, to_index] = value
     gap_connections[from_index, to_index] = 1
 end
-spy(gap_number, plot_title= "Number of gap connections among neurons", xlabel = "Neuron index", ylabel = "Neuron index")
-spy(gap_connections, plot_title= "Gap connections among neurons", xlabel = "Neuron index", ylabel = "Neuron index")
-xticks!(1:50:302)
-yticks!(1:50:302)
 
-# Monoamines
+spy(gap_number, plot_title= "Number of gap connections among neurons", xlabel = "Sending neuron index", ylabel = "Receiving neuron index", color=:berlin)
+spy(gap_connections, plot_title= "Gap connections among neurons", xlabel = "Sending neuron index", ylabel = "Receiving neuron index")
+
+data = vec(gap_number)
+data = filter(x -> x != 0, data)
+# Generate histogram
+histogram(data, bins=:scott, 
+    xticks = unique(data), legend = false, normalize=:probability,
+    xlabel = "Values", ylabel = "Frequency", title = "Gap histogram")
+histogram!(size=(800,500))
+
+
+
+"""ESTO ES EL SURPRISAL (NO ESTA BIEN TODAVIA)"""
+# Calculate surprisal values for the data
+surprisal_data = -log2.(data)
+
+# Sort the data and surprisal values
+sorted_data, sorted_surprisal = sort(data), surprisal_data[sortperm(data)]
+
+# Plot the surprisal curve
+plot!(sorted_data, sorted_surprisal, 
+    linecolor=:blue, linewidth=2, 
+    xlabel="Values", ylabel="Surprisal", title="Surprisal Curve")
+
+
+#gap_number = log.(gap_number .+ 0.7)
+
+"AQUI TERMINA EL SURPRISAL"
+
+
+"Plot the connections by Monoamines"
+# Create a matrix for each type
 mono_connections_tyr = zeros(302,302)
 mono_connections_oct = zeros(302,302)
 mono_connections_dop = zeros(302,302)
 mono_connections_ser = zeros(302,302)
+# Add each connection to the corresponding matrix
 for link in eachrow(data_connect_monoamine)
     from_index = link[:IndexSending]
     to_index = link[:IndexReceiving]
@@ -238,14 +339,39 @@ for link in eachrow(data_connect_monoamine)
         mono_connections_ser[from_index, to_index] = 1
     end
 end
-spy(mono_connections_tyr, color = :orange, plot_title= "Monoamine connections among neurons", xlabel = "Neuron index", ylabel = "Neuron index")
+# Plot all in the same graph
+spy(mono_connections_tyr, color = :orange, plot_title= "Monoamine connections among neurons", xlabel = "Sending neuron index", ylabel = "Receiving neuron index")
 spy!(mono_connections_oct, color = :red)
 spy!(mono_connections_dop, color = :green)
-spy!(mono_connections_ser, color = :blue)
-xticks!(1:50:302)
-yticks!(1:50:302)
+spy!(mono_connections_ser, color = :blue,legend=:outertopright)
 
 
+
+
+"Plot the connections by Neuropeptides (FALTA SABER QUE SIGNIFICA CADA COLUMNA)"
+# Create one matrix for each column of the dataframe
+neuropep_connections_Type1 = zeros(302,302)
+neuropep_connections_Type2 = zeros(302,302)
+# Append the value to the matrix
+for link in eachrow(data_connect_neuropep)
+    from_index = link[:IndexSending]
+    to_index = link[:IndexReceiving]
+    if link[:Type1] !== nothing
+        neuropep_connections_Type1[from_index, to_index] = 1
+    end
+    if link[:Type2] !== nothing
+        neuropep_connections_Type2[from_index, to_index] = 1
+    end
+end
+spy(neuropep_connections_Type1, color = :blue, plot_title= "Neuropeptides connections among neurons", xlabel = "Neuron index", ylabel = "Neuron index")
+spy!(neuropep_connections_Type2, color = :red)
+
+
+
+
+
+
+"Kunert model"
 
 # Set variables
 N = 302 # number of neurons
@@ -253,21 +379,23 @@ E_rev = -65.0 #mV Reversal potential of the synapse
 spikeThresh = 0 #mV Spiking threshold
 specific_capacitance = 1 #uF/cm2
 intracellular_resistivity = 0.03 #kΩ*cm
-g = 100 #pS Conductance (Varshney et al., 2011)
+g = 100 #pS Conductance gap and synaptic (Varshney et al., 2011)
 Gc = 10 #pS Cell membrane conductance 
 C = 1.5 #pF Membrane capacitance (Varshney et al., 2011)
 Ecell = -35.0 #mV Leakage potential 
-#while reversal potential E_j = 0mV for excitatory synapses and −48 mV for inhibitory synapses (Wicks et al., 1996). For the synaptic activity variable, we take ar=11.5, ad=51.5 and width of the sigmoid β = 0.125mV−1 (Wicks et al., 1996). Also for the initial condition of the membrane voltages V and synaptic activity variable s, we sample the normal distribution of μ = 0 and σ = 0.94 with size 279 * 2 (for both V and s) and multiply by 10−4
-C = 0.015 # Cell Membrane Capacitance
-ar = 1/1.5
-ad = 5/1.5
+beta = 0.125  #mV−1 constant
+#C = 0.015 # Cell Membrane Capacitance
+ar = 1/1.5 # Synaptic activity rise time
+ad = 5/1.5 # Synaptic activity decay time
+
+
+Ej = fill(-48,302) #Reversal potential E_j = 0mV for excitatory synapses and −48 mV for inhibitory synapses (Wicks et al., 1996).
+Iext = fill(0,301)
+pushfirst!(Iext,2)
 
 """
 Threshold potential for each neuron is computed by imposing dVi/dt=0 (Equation 2 for C. elegans) and solving for Vi. This is equivalent to Solving the following system of linear equations
-Ax=b
-(11)
-A=M1+M2+M3; b=−b1−b3−Iext,
-(12)
+
 where the solution x is N × 1 vector with each entry being the threshold potential Vthreshold for the ith neuron.
 M1 is a matrix of size N × N where N is the number of neurons (279 for C. elegans) with its diagonal terms populated with −Gc (cell membrane capacitance).
 M2 is a diagonal matrix where diagonal term in ith row corresponds to −∑jGgij i.e., the sum of total conductivity of gap junctions for the ith neuron.
@@ -277,54 +405,98 @@ b3=Gs⋅(s∗eqEj) where Ej is a 1D vector of size N × 1 that enlists the direc
 Iext is the input stimuli vector where its ith element determines the input current amplitude for the ith neuron.
 """
 
-println("----------------------------")
-
-show(data_type_sort_soma[!,:Neuron])
 
 
-"""
-# Ax = b ===> A = M1+M2+M3; b = -b1-b3-Iext
-function threshold_potential_computation()
-    # M1 computation
-    Gc_diag = zeros(302,302)  # diagonal matrix with membrane conductance
-    for i in 1:N
-        Gc_diag[i, i] = Gc
-    end
-    M1 = -Gc_diag
 
-    # M2 computation
-    g_gap = 1.0 # condctance of each gap channel
-    gap_number_cond = g_gap * gap_number  # multiply the conductance of each channel by the number of connections
-    gap_diag_array = sum(gap_number_cond, dims = 2)   # sum of total conductivity for each neuron in its row
-    gap_diag = Diagonal(vec(gap_diag_array))  # diagonal matrix with the values of above
-    M2 = -gap_diag  # minus the above
+"Computing of the threshold potential (Vth)"
+# Ax = b ===> A = M1+M2+M3; b = -b1-b3-Iext  (Equations 11 and 12 from Kunert 2014)
 
-    # M3 computation
-    g_syn = 1.0 # conductance of each synapsis
-    s_eq = ar / (ar + 2 * ad)
-    synaptic_number_cond = g_syn * synaptic_number
-    mult = s_eq * synaptic_number_cond
-    mult_diag_array = sum(mult, dims = 2)
-    mult_diag = Diagonal(vec(mult_diag_array))
-    M3 = -mult_diag
+# M1 computation
+Gc_diag = zeros(302,302)    # Creation of a matrix to append the values
+for i in 1:N                # In the diagonal append the constant of membrane conductance
+    Gc_diag[i, i] = Gc
+end
+M1 = -Gc_diag               # Diagonal matrix of size N × N (N=302) with minus the membrane conductance
 
-    # b1 computation
-    Ec = fill(Ecell, N) # 1D vector of size N × 1 in which all of its elements are Ec (leakage potential)
-    b1 = Gc *Ec  # cell membrane conductance * Ec
-
-    # b3 computation
-    #Ej # 1D vector of size N × 1 that enlists the directionality of each neuron (0 if excitatory or −48 mV if inhibitory)
-    b3 = synaptic_number_cond .* (s_eq * Ej)
+# M2 computation
+gap_number_cond = g * gap_number       # Multiply the conductance of each channel (g=100pS) by the number of connections
+gap_diag_array = sum(gap_number_cond, dims = 2)   # Sum of total conductivity for each neuron in its row
+gap_diag = Diagonal(vec(gap_diag_array))  # Diagonal matrix with the values of above
+M2 = -gap_diag  # Diagonal matrix of size N × N where the term corresponds to the sum of total conductivity of gap junctions for the ith neuron.
 
 
-    M = M1 + M2 + M3
-    b = - b1 - b3 # - Iext
+# M3 computation
+s_eq = ar / (ar + 2 * ad)       # Formula to compute the synaptic activity in equilibrium (is obtained by imposing dsi/dt=0 and synaptic activation Φ = 1/2 in Kunert equations)
+synaptic_number_cond = g * synaptic_number  # Compute the maximum total conductivity of synapses to i from j
+mult = s_eq * synaptic_number_cond          # Multiply both terms 
+mult_diag_array = sum(mult, dims = 2)       # Sum of total conductivity multiplied by Seq for each neuron in its row
+mult_diag = Diagonal(vec(mult_diag_array))
+M3 = -mult_diag                             # Diagonal matrix of size N × N 
+
+# b1 computation
+Ec = fill(Ecell, N)     # 1D vector of size N × 1 in which all of its elements are Ec (leakage potential)
+b1 = Gc * Ec            # Cell membrane conductance * Ec
+
+# b3 computation
+#Ej -> 1D vector of size N × 1 that enlists the directionality of each neuron (0 if excitatory or −48 mV if inhibitory)
+b3 = g .* (s_eq * Ej)   # 1D vector of size N × 1 
+
+# Compute A and b
+A = M1 + M2 + M3
+b = - b1 - b3 - Iext
+
+# Solve Ax=b for x
+A_inv = inv(A)      # Inverse of a
+Vth = A_inv * b     # Vth is a N × 1 vector that contains the threshold potential value for each neuron
+plot(Vth)           # Plot the vector Vth
+
+
+
+function kunert_eq(du, u, p, t)
+    Vi, si = u
+    Gg, Gs, C, ar, ad, beta, Vth, Gc, Ecell, Ej = p
+    # Parameter explanation:    Gg: matrix of N × N, corresponds to the total conductivity of gap junctions between i and j
+    #                           Gs: matrix of N × N, corresponds to the maximum total conductivity of synapses between i and j
+    #                           C: constant scalar, cell membrane capacitance
+    #                           ar: constant scalar, correspond to the synaptic activity rise time
+    #                           ad: constant scalar, correspond to the synaptic activity decay time
+    #                           beta: constant scalar, width of the sigmoid function Φ (equation 6 of Kunert 2014)
+    #                           Vth: vector of N × 1, corresponds to the threshold potential  
+    #                           Gc: constant scalar, corresponds to the cell membrane conductance
+    #                           Ecell: constant scalar, corresponds to the leakage potential
+    #                           Ej: vector of N × 1, corresponds to the directionality of each neuron
+
+    # Corresponds to equation 3 of Kunert 2014
+    eq_IiGap = sum(Gg * (Vi - (-70)), dims = 2)     # Sum of total conductivity multiplied by the voltage difference for each neuron in its row
+    eq_IiGap = vec(eq_IiGap)                        # Vector of dimension N × 1
+    
+    # Corresponds to equation 4 of Kunert 2014
+    eq_IiSyn = sum(Gs * si * (Vi - Ej[1]), dims = 2)    # Sum of total conductivity multiplied by the voltage difference for each neuron in its row
+    eq_IiSyn = vec(eq_IiSyn)                            # Vector of dimension N × 1 
+
+    "Intento solo para la primera neurona"
+    du[1] = (-Gc * (Vi - Ecell) - eq_IiGap[1] - eq_IiSyn[1] + 40 ) / C          # Corresponds to equation 2 of Kunert 2014
+    du[2] = ar * (1 / (1 + exp(-beta * (Vi - Vth[1])))) * (1 - si) - ad * si    # Corresponds to equation 5 and 6 of Kunert 2014
 
 end
 
-"""
+
+#For the initial condition of the membrane voltages V and synaptic activity variable s, we sample the normal distribution of μ = 0 and σ = 0.94 with size 279 * 2 (for both V and s) and multiply by 10−4
+# Set initial conditions (No estan bien pero por poner algo)
+u0 = [-80, 0]
 
 
+# Set parameters
+p = [gap_number_cond, synaptic_number_cond, C, ar, ad, beta, Vth, Gc, Ecell, Ej]
+
+# Set time span
+tspan = (0.0, 0.10)  # Adjust the time span as needed
+#u_begin = fill(0,604)
+
+# Solve the differential equation
+prob = ODEProblem(kunert_eq, u0, tspan, p)
+sol = solve(prob) 
+plot(sol)
 
 
 
