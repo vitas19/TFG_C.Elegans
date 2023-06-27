@@ -262,7 +262,7 @@ for link in eachrow(data_connect_synaptic)
     synaptic_connections[from_index, to_index] = 1
 end
 # Plot both matrices
-spy(synaptic_number, plot_title= "Number of synaptic connections among neurons", xlabel = "Sending neuron index", ylabel = "Rceiving neuron index", color=:berlin)
+spy(synaptic_number, plot_title= "Number of synaptic connections", xlabel = "Sending neuron index", ylabel = "Rceiving neuron index", color=:berlin)
 spy(synaptic_connections, plot_title= "Synaptic connections among neurons", xlabel = "Sending neuron index", ylabel = "Receiving neuron index")
 
 
@@ -272,8 +272,8 @@ data_s = filter(x -> x != 0, data_s)    # Take out the values that are 0 for a t
 # Generate histogram
 histogram(data_s, bins=:scott, 
     xticks = unique(data_s), legend = false, normalize=:probability,
-    xlabel = "Values", ylabel = "Frequency", title = "Synaptic histogram")
-histogram!(size=(800,500))
+    xlabel = "Number of connections between two neurons", ylabel = "Frequency", title = "Synaptic frequency histogram")
+histogram!(size=(760,500))
 
 
 
@@ -296,7 +296,7 @@ data = filter(x -> x != 0, data)
 # Generate histogram
 histogram(data, bins=:scott, 
     xticks = unique(data), legend = false, normalize=:probability,
-    xlabel = "Values", ylabel = "Frequency", title = "Gap histogram")
+    xlabel = "Number of connections between two neurons", ylabel = "Frequency", title = "Gap frecuency histogram")
 histogram!(size=(800,500))
 
 
@@ -466,37 +466,61 @@ function kunert_eq(du, u, p, t)
     #                           Ecell: constant scalar, corresponds to the leakage potential
     #                           Ej: vector of N × 1, corresponds to the directionality of each neuron
 
+
+    Ni = length(Vi)
     # Corresponds to equation 3 of Kunert 2014
-    eq_IiGap = sum(Gg * (Vi - (-70)), dims = 2)     # Sum of total conductivity multiplied by the voltage difference for each neuron in its row
+    eq_IiGap = sum(Gg * (Vi[1] - (-70)), dims = 2)     # Sum of total conductivity multiplied by the voltage difference for each neuron in its row
     eq_IiGap = vec(eq_IiGap)                        # Vector of dimension N × 1
     
     # Corresponds to equation 4 of Kunert 2014
-    eq_IiSyn = sum(Gs * si * (Vi - Ej[1]), dims = 2)    # Sum of total conductivity multiplied by the voltage difference for each neuron in its row
+    eq_IiSyn = sum(Gs * si * (Vi[1] - Ej[1]), dims = 2)    # Sum of total conductivity multiplied by the voltage difference for each neuron in its row
     eq_IiSyn = vec(eq_IiSyn)                            # Vector of dimension N × 1 
 
     "Intento solo para la primera neurona"
-    du[1] = (-Gc * (Vi - Ecell) - eq_IiGap[1] - eq_IiSyn[1] + 40 ) / C          # Corresponds to equation 2 of Kunert 2014
-    du[2] = ar * (1 / (1 + exp(-beta * (Vi - Vth[1])))) * (1 - si) - ad * si    # Corresponds to equation 5 and 6 of Kunert 2014
-
+    for i in 1:Ni
+        du[i] = (-Gc * (Vi[i] - Ecell) - eq_IiGap[i] - eq_IiSyn[i] + 20 ) / C          # Corresponds to equation 2 of Kunert 2014
+        du[i+Ni] = ar * (1 / (1 + exp(-beta * (Vi[i] - Vth[i])))) * (1 - si) - ad * si    # Corresponds to equation 5 and 6 of Kunert 2014
+    end
 end
 
+vector = [ones(10); zeros(15)]
 
 #For the initial condition of the membrane voltages V and synaptic activity variable s, we sample the normal distribution of μ = 0 and σ = 0.94 with size 279 * 2 (for both V and s) and multiply by 10−4
 # Set initial conditions (No estan bien pero por poner algo)
-u0 = [-80, 0]
+Vi0 = zeros(N)
+si0 = fill(0.5,302)
+u0 = [Vi0; si0]
 
 
 # Set parameters
 p = [gap_number_cond, synaptic_number_cond, C, ar, ad, beta, Vth, Gc, Ecell, Ej]
 
 # Set time span
-tspan = (0.0, 0.10)  # Adjust the time span as needed
+tspan = (0.0, 0.20)  # Adjust the time span as needed
 #u_begin = fill(0,604)
 
 # Solve the differential equation
 prob = ODEProblem(kunert_eq, u0, tspan, p)
 sol = solve(prob) 
+
 plot(sol)
 
+t = sol.t
+Vi_results = [sol[i][1:N] for i in 1:length(t)]
+si_results = [sol[i][N+1:end] for i in 1:length(t)]
 
+output_arrays = []
 
+for i in 1:25  # Iterate over each value in the vectors (302 values)
+    push!(output_arrays, Vi_results[i][2])
+end
+
+println(output_arrays)
+
+plot(50, output_arrays, xlabel = "Time", ylabel = "Voltage (Vi)", label = "", linewidth = 2)
+
+p1 = plot(xlabel = "Time", ylabel = "Voltage (Vi)", linewidth = 2)
+for i in 1:size(Vi_results, 2)
+    plot!(p1, t, Vi_results[:, i], label = "Neuron $i")
+end
+plot(p1)
