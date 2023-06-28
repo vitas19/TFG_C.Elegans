@@ -505,6 +505,9 @@ sol = solve(prob)
 
 plot(sol)
 
+
+"""A PARTIR DE AQUI NO FUNCIONA"""
+
 t = sol.t
 Vi_results = [sol[i][1:N] for i in 1:length(t)]
 si_results = [sol[i][N+1:end] for i in 1:length(t)]
@@ -512,7 +515,7 @@ si_results = [sol[i][N+1:end] for i in 1:length(t)]
 output_arrays = []
 
 for i in 1:25  # Iterate over each value in the vectors (302 values)
-    push!(output_arrays, Vi_results[i][2])
+    push!(output_arrays, Vi_results[i][1])
 end
 
 println(output_arrays)
