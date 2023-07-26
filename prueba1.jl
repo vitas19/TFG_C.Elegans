@@ -8,6 +8,9 @@ using Plots
 using DifferentialEquations
 using ModelingToolkit
 using DiffEqBase
+using DynamicalSystems
+using InteractiveChaos
+using CairoMakie
 
 "The following lines extract the data from different files and stores as a dataframe"
 
@@ -391,7 +394,7 @@ ad = 5/1.5 # Synaptic activity decay time
 
 Ej = fill(-48,302) #Reversal potential E_j = 0mV for excitatory synapses and −48 mV for inhibitory synapses (Wicks et al., 1996).
 Iext = fill(0,301)
-pushfirst!(Iext,2)
+pushfirst!(Iext,20)
 
 """
 Threshold potential for each neuron is computed by imposing dVi/dt=0 (Equation 2 for C. elegans) and solving for Vi. This is equivalent to Solving the following system of linear equations
@@ -452,7 +455,7 @@ plot(Vth)           # Plot the vector Vth
 
 
 
-function kunert_eq(du, u, p, t)
+function kunert_eq(u, p)
     Vi, si = u
     Gg, Gs, C, ar, ad, beta, Vth, Gc, Ecell, Ej = p
     # Parameter explanation:    Gg: matrix of N × N, corresponds to the total conductivity of gap junctions between i and j
@@ -477,11 +480,33 @@ function kunert_eq(du, u, p, t)
     eq_IiSyn = vec(eq_IiSyn)                            # Vector of dimension N × 1 
 
     "Intento solo para la primera neurona"
-    for i in 1:Ni
-        du[i] = (-Gc * (Vi[i] - Ecell) - eq_IiGap[i] - eq_IiSyn[i] + 20 ) / C          # Corresponds to equation 2 of Kunert 2014
-        du[i+Ni] = ar * (1 / (1 + exp(-beta * (Vi[i] - Vth[i])))) * (1 - si) - ad * si    # Corresponds to equation 5 and 6 of Kunert 2014
-    end
+    #for i in 1:Ni
+    du = (-Gc * (x[1] - Ecell) - eq_IiGap[1] - eq_IiSyn[1] + 20 ) / C          # Corresponds to equation 2 of Kunert 2014
+    di = ar * (1 / (1 + exp(-beta * (x[1] - Vth[1])))) * (1 - x[2]) - ad * x[2]    # Corresponds to equation 5 and 6 of Kunert 2014
+    #end
+    # Vi == x[1], si == x[2]
+    return SVector(du, di)
 end
+
+using DifferentialEquations
+
+# Create a vector of 302 neurons, each with two states (u and i).
+neurons = zeros(302, 2)
+
+# Define the derivatives of the states with respect to time for each neuron.
+function derivatives(t, neurons)
+  du = (-Gc * (neurons[:, 0] - Ecell) - eq_IiGap[1] - eq_IiSyn[1] + 20 ) / C
+  di = ar * (1 / (1 + exp(-beta * (neurons[:, 0] - Vth[1])))) * (1 - neurons[:, 2]) - ad * neurons[:, 2]
+  return du, di
+end
+
+# Solve the system of differential equations.
+tspan = (0, 100)
+solution = solve(derivatives, neurons, tspan)
+
+# Plot the results of the simulation.
+plot(tspan, solution[:, 0])
+plot(tspan, solution[:, 1])
 
 vector = [ones(10); zeros(15)]
 
@@ -489,8 +514,8 @@ vector = [ones(10); zeros(15)]
 # Set initial conditions (No estan bien pero por poner algo)
 Vi0 = zeros(N)
 si0 = fill(0.5,302)
-u0 = [Vi0; si0]
-
+#u0 = [Vi0; si0]
+u0 = [-40, 0.5]
 
 # Set parameters
 p = [gap_number_cond, synaptic_number_cond, C, ar, ad, beta, Vth, Gc, Ecell, Ej]
@@ -500,8 +525,15 @@ tspan = (0.0, 0.05)  # Adjust the time span as needed
 #u_begin = fill(0,604)
 
 # Solve the differential equation
-prob = ODEProblem(kunert_eq, u0, tspan, p)
-sol = solve(prob) 
+prob = ContinuousDynamicalSystem(kunert_eq, u0, p)
+sol = trajectory(prob, tspan)
 
-plot(sol)
+# Plot the solution
+plot(sol, vars=(1,2))
+
+
+
+T = 100
+samp = 0.01
+
 
