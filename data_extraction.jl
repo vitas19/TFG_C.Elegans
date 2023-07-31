@@ -1,14 +1,16 @@
-using DataFrames
+#%% Import packages
 using CSV
-using XLSX
-using LinearAlgebra
 using ColorSchemes
 using Colors
-using Plots
-using DifferentialEquations
-using ModelingToolkit
+using DataFrames
 using DiffEqBase
+using DifferentialEquations
+using LinearAlgebra
+using ModelingToolkit
+using Plots
+using XLSX
 
+#%% DATA IMPORT
 "The following lines extract the data from different files and stores as a dataframe"
 
 
@@ -122,7 +124,7 @@ neurotransmitter"""
 
 
 
-
+#%% DATA FRAMES AND CLEANING
 "DATAFRAMES CLEANING"
 # GAP AND SYNAPTIC
 # From all the dataframe of data_type_neuron only select the first three columns
@@ -153,7 +155,7 @@ data_connect = data_connect[data_connect.Type .!= "R", :]
 data_connect = data_connect[data_connect.Type .!= "Rp", :]
 data_connect = data_connect[data_connect.Type .!= "NMJ", :]
 
-
+#%% Data homogeneization
 "TRANSFORM THE CONNECTIONS FROM NEURON NAMES TO NUMBERS FOR GAP AND SYNAPTIC"
 # Create a new dictionary to append the indexes
 data_index = DataFrame(IndexSending=Any[], IndexReceiving=Any[])
@@ -189,6 +191,7 @@ data_connect_gap = vcat(data_connect_G, data_connect_EJ)
 
 
 
+#%% Dataframes and cleaning
 "DATAFRAMES CLEANING"
 # MONOAMINES AND NUEROPEPTIDES
 # From all the dataframe of data_type_neuron only select the first three columns
@@ -248,7 +251,7 @@ data_connect_monoamine
 data_connect_neuropep
 "
 
-
+#%% Data exploration 
 "Plot the number of connections of the synaptic and gap"
 # Create two matrices for storing the connectivity information
 synaptic_number = zeros(302, 302)           # To store the number of connections
