@@ -1,3 +1,5 @@
+#! /usr/local/bin/julia
+
 #%% Import packages
 using CSV
 using ColorSchemes
@@ -197,7 +199,7 @@ data_connect_gap = vcat(data_connect_G, data_connect_EJ)
 # From all the dataframe of data_type_neuron only select the first three columns
 data_connect_monoamine = data_connect_monoamine[:, 1:3]
 
-# TRANSFORM THE CONNECTIONS FROM NEURON NAMES TO NUMBERS FOR MONOAMINES
+#%% TRANSFORM THE CONNECTIONS FROM NEURON NAMES TO NUMBERS FOR MONOAMINES
 # Create a new dictionary to append the indexes
 data_index_mono = DataFrame(IndexSending=Any[], IndexReceiving=Any[])
 # Create two vectors to store the indeces before appending
@@ -253,6 +255,7 @@ data_connect_neuropep
 
 #%% Data exploration 
 "Plot the number of connections of the synaptic and gap"
+
 # Create two matrices for storing the connectivity information
 synaptic_number = zeros(302, 302)           # To store the number of connections
 synaptic_connections = zeros(302, 302)      # To store if there is a connection
@@ -269,7 +272,7 @@ spy(synaptic_number, plot_title= "Number of synaptic connections", xlabel = "Sen
 spy(synaptic_connections, plot_title= "Synaptic connections among neurons", xlabel = "Sending neuron index", ylabel = "Receiving neuron index")
 
 
-# For viewing the infromation of the frequency of the number of connections
+#%% For viewing the information of the frequency of the number of connections
 data_s = vec(synaptic_number)           # Flatten the matrix into a 1D array
 data_s = filter(x -> x != 0, data_s)    # Take out the values that are 0 for a true result
 # Generate histogram
@@ -374,6 +377,7 @@ spy!(neuropep_connections_Type2, color = :red)
 
 
 
+#%% ACTUAL NEURAL MODELLING AFTER EXPLORATORY ANALYSIS
 "Kunert model"
 
 # Set variables
@@ -488,8 +492,9 @@ end
 
 vector = [ones(10); zeros(15)]
 
-#For the initial condition of the membrane voltages V and synaptic activity variable s, we sample the normal distribution of μ = 0 and σ = 0.94 with size 279 * 2 (for both V and s) and multiply by 10−4
-# Set initial conditions (No estan bien pero por poner algo)
+# For the initial condition of the membrane voltages V and synaptic activity variable s, we sample the normal distribution of μ = 0 and σ = 0.94 with size 279 * 2 (for both V and s) and multiply by 10−4
+# Set initial conditions 
+# Viktoriya: (No estan bien pero por poner algo)
 Vi0 = zeros(N)
 si0 = fill(0.5,302)
 u0 = [Vi0; si0]

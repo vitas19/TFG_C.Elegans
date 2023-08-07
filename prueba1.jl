@@ -1,3 +1,6 @@
+#! /usr/local/bin/julia
+
+#%% Building the environment
 using DataFrames
 using CSV
 using XLSX
@@ -12,7 +15,11 @@ using DynamicalSystems
 using InteractiveChaos
 using CairoMakie
 
-"The following lines extract the data from different files and stores as a dataframe"
+#using PlotlyBase
+#plotly() # FVA: the least intrusive backend, but needs the previous line
+
+## %% Reading the data in
+println("The following lines extract the data from different files and stores as a dataframe")
 
 
 data_connect_phar = CSV.read("RawData/ConexionsPharyngeal.csv", DataFrame)
@@ -125,8 +132,8 @@ neurotransmitter"""
 
 
 
-
-"DATAFRAMES CLEANING"
+##%% Cleaning dataframes
+println("DATAFRAMES CLEANING")
 # GAP AND SYNAPTIC
 # From all the dataframe of data_type_neuron only select the first three columns
 data_type_neuron = data_type_neuron[:, 1:3]
@@ -140,9 +147,9 @@ data_type_sort_soma = sort!(data_type, [:"Soma Position"])
 # Add a column to know for the future the number of the neuron
 data_type_sort_soma.Place = 1:302
 
-" IMPORTANT VARIABLES:
+println(" IMPORTANT VARIABLES:
 data_type_sort_soma
-"
+")
 
 # Interchange the "Number" and "Type" columns
 select!(data_connect_phar, [:Sending,:Receiving,:Type, :Number])
@@ -157,7 +164,7 @@ data_connect = data_connect[data_connect.Type .!= "Rp", :]
 data_connect = data_connect[data_connect.Type .!= "NMJ", :]
 
 
-"TRANSFORM THE CONNECTIONS FROM NEURON NAMES TO NUMBERS FOR GAP AND SYNAPTIC"
+println("TRANSFORM THE CONNECTIONS FROM NEURON NAMES TO NUMBERS FOR GAP AND SYNAPTIC")
 # Create a new dictionary to append the indexes
 data_index = DataFrame(IndexSending=Any[], IndexReceiving=Any[])
 # Create two vectors to store the indeces before appending
@@ -192,7 +199,7 @@ data_connect_gap = vcat(data_connect_G, data_connect_EJ)
 
 
 
-"DATAFRAMES CLEANING"
+println("DATAFRAMES CLEANING")
 # MONOAMINES AND NUEROPEPTIDES
 # From all the dataframe of data_type_neuron only select the first three columns
 data_connect_monoamine = data_connect_monoamine[:, 1:3]
@@ -221,7 +228,7 @@ data_connect_monoamine = hcat(data_connect_monoamine, data_index_mono)
 
 
 
-"TRANSFORM THE CONNECTIONS FROM NEURON NAMES TO NUMBERS FOR MONOAMINES"
+println("TRANSFORM THE CONNECTIONS FROM NEURON NAMES TO NUMBERS FOR MONOAMINES")
 # Create a new dictionary to append the indexes
 data_index_neuropep = DataFrame(IndexSending=Any[], IndexReceiving=Any[])
 # Create two vectors to store the indeces before appending
@@ -249,10 +256,10 @@ data_connect_synaptic
 data_connect_gap
 data_connect_monoamine
 data_connect_neuropep
-"
+" 
 
 
-"Plot the number of connections of the synaptic and gap"
+println("Plot the number of connections of the synaptic and gap")
 # Create two matrices for storing the connectivity information
 synaptic_number = zeros(302, 302)           # To store the number of connections
 synaptic_connections = zeros(302, 302)      # To store if there is a connection
@@ -265,11 +272,11 @@ for link in eachrow(data_connect_synaptic)
     synaptic_connections[from_index, to_index] = 1
 end
 # Plot both matrices
-spy(synaptic_number, plot_title= "Number of synaptic connections", xlabel = "Sending neuron index", ylabel = "Rceiving neuron index", color=:berlin)
-spy(synaptic_connections, plot_title= "Synaptic connections among neurons", xlabel = "Sending neuron index", ylabel = "Receiving neuron index")
+Plots.spy(synaptic_number, plot_title= "Number of synaptic connections", xlabel = "Sending neuron index", ylabel = "Rceiving neuron index", color=:berlin)
+Plots.spy(synaptic_connections, plot_title= "Synaptic connections among neurons", xlabel = "Sending neuron index", ylabel = "Receiving neuron index")
 
 
-# For viewing the infromation of the frequency of the number of connections
+# For viewing the information of the frequency of the number of connections
 data_s = vec(synaptic_number)           # Flatten the matrix into a 1D array
 data_s = filter(x -> x != 0, data_s)    # Take out the values that are 0 for a true result
 # Generate histogram
@@ -291,8 +298,8 @@ for link in eachrow(data_connect_gap)
     gap_connections[from_index, to_index] = 1
 end
 
-spy(gap_number, plot_title= "Number of gap connections among neurons", xlabel = "Sending neuron index", ylabel = "Receiving neuron index", color=:berlin)
-spy(gap_connections, plot_title= "Gap connections among neurons", xlabel = "Sending neuron index", ylabel = "Receiving neuron index")
+Plots.spy(gap_number, plot_title= "Number of gap connections among neurons", xlabel = "Sending neuron index", ylabel = "Receiving neuron index", color=:berlin)
+Plots.spy(gap_connections, plot_title= "Gap connections among neurons", xlabel = "Sending neuron index", ylabel = "Receiving neuron index")
 
 data = vec(gap_number)
 data = filter(x -> x != 0, data)
@@ -312,7 +319,7 @@ surprisal_data = -log2.(data)
 sorted_data, sorted_surprisal = sort(data), surprisal_data[sortperm(data)]
 
 # Plot the surprisal curve
-plot!(sorted_data, sorted_surprisal, 
+Plots.plot!(sorted_data, sorted_surprisal, 
     linecolor=:blue, linewidth=2, 
     xlabel="Values", ylabel="Surprisal", title="Surprisal Curve")
 
@@ -343,10 +350,10 @@ for link in eachrow(data_connect_monoamine)
     end
 end
 # Plot all in the same graph
-spy(mono_connections_tyr, color = :orange, plot_title= "Monoamine connections among neurons", xlabel = "Sending neuron index", ylabel = "Receiving neuron index")
-spy!(mono_connections_oct, color = :red)
-spy!(mono_connections_dop, color = :green)
-spy!(mono_connections_ser, color = :blue,legend=:outertopright)
+Plots.spy(mono_connections_tyr, color = :orange, plot_title= "Monoamine connections among neurons", xlabel = "Sending neuron index", ylabel = "Receiving neuron index")
+Plots.spy!(mono_connections_oct, color = :red)
+Plots.spy!(mono_connections_dop, color = :green)
+Plots.spy!(mono_connections_ser, color = :blue,legend=:outertopright)
 
 
 
@@ -366,15 +373,20 @@ for link in eachrow(data_connect_neuropep)
         neuropep_connections_Type2[from_index, to_index] = 1
     end
 end
-spy(neuropep_connections_Type1, color = :blue, plot_title= "Neuropeptides connections among neurons", xlabel = "Neuron index", ylabel = "Neuron index")
-spy!(neuropep_connections_Type2, color = :red)
+Plots.spy(neuropep_connections_Type1, color = :blue, plot_title= "Neuropeptides connections among neurons", xlabel = "Neuron index", ylabel = "Neuron index")
+Plots.spy!(neuropep_connections_Type2, color = :red)
 
 
+###################################################################################
+###################################################################################
+###################################################################################
+println("Here starts the modelling, so conceptually it is no longer an exploration.")
+###################################################################################
 
 
-
-
-"Kunert model"
+###################################################################################
+println("Kunert model")
+###################################################################################
 
 # Set variables
 N = 302 # number of neurons
@@ -411,24 +423,25 @@ Iext is the input stimuli vector where its ith element determines the input curr
 
 
 
-"Computing of the threshold potential (Vth)"
+println("Computing of the threshold potential (Vth)")
 # Ax = b ===> A = M1+M2+M3; b = -b1-b3-Iext  (Equations 11 and 12 from Kunert 2014)
 
-# M1 computation
+println("Computing the multilayered model by accumulating connectomes")
+# M1 computation: GAP junctions
 Gc_diag = zeros(302,302)    # Creation of a matrix to append the values
 for i in 1:N                # In the diagonal append the constant of membrane conductance
     Gc_diag[i, i] = Gc
 end
 M1 = -Gc_diag               # Diagonal matrix of size N × N (N=302) with minus the membrane conductance
 
-# M2 computation
+# M2 computation: Synaptic connections
 gap_number_cond = g * gap_number       # Multiply the conductance of each channel (g=100pS) by the number of connections
 gap_diag_array = sum(gap_number_cond, dims = 2)   # Sum of total conductivity for each neuron in its row
 gap_diag = Diagonal(vec(gap_diag_array))  # Diagonal matrix with the values of above
 M2 = -gap_diag  # Diagonal matrix of size N × N where the term corresponds to the sum of total conductivity of gap junctions for the ith neuron.
 
 
-# M3 computation
+# M3 computation: Monoamines.
 s_eq = ar / (ar + 2 * ad)       # Formula to compute the synaptic activity in equilibrium (is obtained by imposing dsi/dt=0 and synaptic activation Φ = 1/2 in Kunert equations)
 synaptic_number_cond = g * synaptic_number  # Compute the maximum total conductivity of synapses to i from j
 mult = s_eq * synaptic_number_cond          # Multiply both terms 
@@ -451,7 +464,7 @@ b = - b1 - b3 - Iext
 # Solve Ax=b for x
 A_inv = inv(A)      # Inverse of a
 Vth = A_inv * b     # Vth is a N × 1 vector that contains the threshold potential value for each neuron
-plot(Vth)           # Plot the vector Vth
+Plots.plot(Vth)           # Plot the vector Vth
 
 
 
@@ -488,7 +501,8 @@ function kunert_eq(u, p)
     return SVector(du, di)
 end
 
-using DifferentialEquations
+#FVA: the sentence below is redundant
+#using DifferentialEquations
 
 # Create a vector of 302 neurons, each with two states (u and i).
 neurons = zeros(302, 2)
@@ -500,6 +514,7 @@ function derivatives(t, neurons)
   return du, di
 end
 
+#FVA: This is the line that generates the error.
 # Solve the system of differential equations.
 tspan = (0, 100)
 solution = solve(derivatives, neurons, tspan)
