@@ -253,6 +253,19 @@ data_connect_monoamine
 data_connect_neuropep
 "
 
+
+
+
+
+
+
+
+
+
+
+
+
+
 #%% Data exploration 
 "Plot the number of connections of the synaptic and gap"
 
@@ -377,12 +390,16 @@ spy!(neuropep_connections_Type2, color = :red)
 
 
 
+
+
+
+
 #%% ACTUAL NEURAL MODELLING AFTER EXPLORATORY ANALYSIS
 "Kunert model"
 
 # Set variables
 N = 302 # number of neurons
-E_rev = -65.0 #V Reversal potential of the synapse (-65 mV)
+E_rev = -65.0 #mV Reversal potential of the synapse (-65 mV)
 spikeThresh = 0 #V Spiking threshold
 specific_capacitance = 1 #uF/cm2
 intracellular_resistivity = 0.03 #kΩ*cm

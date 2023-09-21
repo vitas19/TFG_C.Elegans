@@ -16,10 +16,13 @@ using XLSX
 # using LinearAlgebra
 # using ModelingToolkit
 
-# FVA: so dar 07/08/23
 
 #%% DATA IMPORT
 "The following lines extract the data from different files and stores as a dataframe"
+
+
+# These data come from the WormAtlas, specifically from:
+# 2 Neuronal Connectivity II: by L.R. Varshney, B.L. Chen, E. Paniagua, D.H. Hall and D.B. Chklovskii
 
 data_connect_phar = CSV.read(datadir("exp_raw","ConexionsPharyngeal.csv"), DataFrame) 
 # data_connect_phar = CSV.read("RawData/ConexionsPharyngeal.csv", DataFrame)
@@ -32,6 +35,7 @@ Type: Type of synapse: S: synaptic; G: gap.
 
 
 data_connect_neuron = DataFrame(XLSX.readtable(datadir("exp_raw","NeuronConnect.xlsx"), "Sheet1"))
+# These data come from WormAtlas in NeuronConnect.xls(x)
 # data_connect_neuron = DataFrame(XLSX.readtable("RawData/NeuronConnect.xlsx", "Sheet1"))
 """
 N1: Neuron 1 name
@@ -128,6 +132,22 @@ Neurotransmitter2: If the nueron sends another neurotransmitter it is stated her
 """
 
 
+# From Varshney et al, 2011.
+# Results.
+# A new wiring diagram
+# The C. elegans nervous system contains 302 neurons and is divided into
+# the pharyngeal nervous system containing 20 neurons and the somatic
+# nervous system containing 282 neurons. We updated the wiring diagram
+# (see Methods) of the larger somatic nervous system. Since neurons
+# CANL/R and VC06 do not make synapses with other neurons, we restrict
+# our attention to the remaining 279 somatic neurons.
+# The wiring diagram consists of
+# - 6393 chemical synapses,
+# - 890 gap junctions, and
+# - 1410 neuromuscular junctions.
+
+
+
 """ IMPORTANT VARIABLES: the DataFrames read in
 1. data_connect_phar
 2. data_connect_neuron
@@ -157,7 +177,7 @@ data_type_sort_soma = sort!(data_type, [:"Soma Position"])
 data_type_sort_soma.Place = 1:302
 
 " IMPORTANT VARIABLES:
-data_type_sort_soma #FVA: As the variable gathering all GJ and Synapsis 
+data_type_sort_soma: As the variable gathering all GJ and Synapsis 
 "
 
 # Interchange the "Number" and "Type" columns
