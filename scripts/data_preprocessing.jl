@@ -148,6 +148,18 @@ Neurotransmitter2: If the nueron sends another neurotransmitter it is stated her
 
 
 
+
+
+functional_conn = DataFrame(XLSX.readtable(datadir("exp_raw","FunctionalConnectivity.xlsx"), "Sheet1"))
+"""This table originates from the data in Figure 1E from the paper "A set of hub neurons and non-local 
+connectivity features support global brain dynamics in C. elegans", (https://doi.org/10.1016/j.cub.2022.06.039)				
+
+Sending: Name of sending neuron
+Receiving: Name of receiving neuron
+Value: either 0mV is excitatory or -48mV if inhibitory
+"""
+
+
 """ IMPORTANT VARIABLES: the DataFrames read in
 1. data_connect_phar
 2. data_connect_neuron
@@ -277,6 +289,33 @@ for row in eachrow(data_connect_neuropep)
 end
 # Concatenate horizontally the dictionary of data_connect and indeces
 data_connect_neuropep = hcat(data_connect_neuropep, data_index_neuropep)
+
+
+
+println("TRANSFORM THE CONNECTIONS FROM NEURON NAMES TO NUMBERS FOR FUNCTIONAL CONNECTIONS.")
+# Create a new dictionary to append the indexes
+data_index_functional = DataFrame(IndexSending=Any[], IndexReceiving=Any[])
+# Create two vectors to store the indeces before appending
+sending_value_functional = Vector{Int64}()
+receiving_value_functional = Vector{Int64}()
+i = 1
+# Iterate through each row and append to the new dataframe with the sending and receiving value
+for row in eachrow(functional_conn)
+    for value in eachrow(data_type_sort_soma)
+        if row[:Sending] == value[:Neuron]
+            append!(sending_value_functional, value[:Place])
+        end
+        if row[:Receiving] == value[:Neuron]
+            append!(receiving_value_functional, value[:Place])
+        end    
+    end
+    print(data_index_functional)
+    push!(data_index_functional, (sending_value_functional[i], receiving_value_functional[i]))
+    global i = i+1
+end
+# Concatenate horizontally the dictionary of data_connect and indices
+data_functional = hcat(functional_conn, data_index_functional)
+
 
 
 " IMPORTANT VARIABLES:

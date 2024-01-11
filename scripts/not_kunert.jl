@@ -1,5 +1,4 @@
 # KUNERT MODEL 
-include("data_preprocessing.jl") 
 include("plots.jl")
 using Plots
 using OrdinaryDiffEq
@@ -7,6 +6,7 @@ using TimerOutputs
 using Gadfly
 using Chain
 using LinearAlgebra
+using MAT
 # Constants 
 
 " Number of neurons in the Celegans connectome."
@@ -101,14 +101,14 @@ b3 = gᵞ * (s_eq * Ej)   # 1D vector of size N × 1
 """
 Excitatory current for sensory experiment on CO2 sensing on BAG in C.elegans. In mV(?)
 """
-Iext = zeros(nNeurons);#zero-input condition
+Iext = zeros(nNeurons) #zero-input condition
 
 # Compute A and b
-A = M1 + M2 + M3;
-b = - b1 - b3 - Iext;
+A = M1 + M2 + M3
+b = - b1 - b3 - Iext
 
 # Solve Ax=b for x
-A_inv = inv(A);      # Inverse of a
+A_inv = inv(A)    # Inverse of a
 """
 Vth is a N × 1 vector that contains the threshold potential value for each neuron
 """
@@ -141,7 +141,60 @@ Gᵞ = gᵞ * gap_number #The matrix of GJ conductances
 
 Sᵞ = gᵞ * synaptic_number #Matrix of Synaptic conductances
 EJ = repeat(Ej',nNeurons,1) #Same ROW is the same
+
+
+#------------------------------------------------------------------------------------------------------------
+# Read the .mat file
+avg_mat = matread("data/exp_raw/AvgCorrMatr.mat")
+# Access the value associated with the key "matrix_key"
+avg_mat = avg_mat["AvgCorrMatr"]
+
+
+# Read the .mat file
+neuron_ord = matread("data/exp_raw/NeuronOrder.mat")
+# Access the value associated with the key "matrix_key"
+ord_mat = neuron_ord["NeuronOrder"]
+
+
+i1 = 1
+i2 = 1
+n = 1
+n1 = nothing
+n2 = nothing
+
+while i1 <= 65
+    neuron1 = ord_mat[1, i1]
+    while i2 <= 65
+        neuron2 = ord_mat[1, i2]
+        while n <= 302
+            if neuron1 == data_type[n, 1]
+                n1 = n
+            end
+
+            if neuron2 == data_type[n, 1]
+                n2 = n                
+            end
+            n += 1
+        end
+
+        try
+            EJ[n1, n2] = Int(round(EJ[n1, n2] * avg_mat[i1, i2]))
+        catch
+            print("")
+        end
+
+        n = 1
+        i2 += 1
+    end
+    i2 = 1
+    i1 += 1
+end
 spy(EJ)
+
+
+
+#---------------------------------------------------------------------------------------------------------------------
+
 @assert all(vec(EJ[rand(1:nNeurons),:] .== EJ[rand(1:nNeurons),:]))
 #typeof(EJ[rand(1:nNeurons),:] .== EJ[rand(1:nNeurons),:])
 function derivatives(nStates, p, t)
@@ -173,7 +226,7 @@ function celegansChangeState!(dS, S, Iₑ, t)
     dS[:,1] .= (-Gc * (S[:, 1] .- Ecell) 
                 -  (sum( Gᵞ .* (allV - allV'), dims=2))
                 -  (Sᵞ .* (allV - EJ)) * S[:, 2]
-                + Iₑ(t)
+                .+ Iₑ(t)
                 ) ./ C
     dS[:,2] .= ar * (1 ./ (1 .+ exp.(-beta * (S[:, 1] .- Vth)))) .* (1 .- S[:, 2]) .- ad * S[:, 2]
   #return hcat(dv,di)
@@ -221,7 +274,8 @@ pulse(20.0, 1.0, 0.5)(1.5)
 # Experiment from Kunert, Shlizerman and Kutz, 2014
 # 1. Get the neuron names of some given neuron name patterns.
 inputNeuronPatterns = ["PLM"]
-outputNeuronPatterns = ["AVA", "AVB", "AVD", "AVE", "PVC"]
+#outputNeuronPatterns = ["AVA", "AVB", "AVD", "AVE", "PVC"]
+outputNeuronPatterns = ["RIM", "AIY", "AFD", "AWA"]
 focusNeuronPatterns =  vcat(inputNeuronPatterns, outputNeuronPatterns)
 
 
@@ -243,7 +297,7 @@ Example vector of excitation functions for an experiment.
 """
 If = Array{Function}(undef,nNeurons);
 If[:] .= null
-A = 100.0#pA, input level for the pulse
+A = 5.0 #pA, input level for the pulse
 If[findNeuronByIndices(inputNeuronPatterns)] .= pulse(A, 1.0, 0.5)
 Ie = vectorInput(If)#This is the matrix of excitations
 # FVA: some assertions should follow.
@@ -283,7 +337,7 @@ if !TEST
 else
     tspan = (0.0, 30.0)#only for half a minute.
 end
-tspan = (0.0, 2.0)#for inputs lasting like a minute.
+tspan = (0.0, 6.0)#for inputs lasting like a minute.
 #tspan = (0.0, 0.5)#for inputs lasting like a minute.
 # gusano1 = ODEProblem(dState, nStates, tspan)#Not working
 # sol1 = solve(gusano1)
@@ -363,11 +417,10 @@ show(dfs, allrows = true)
 
 # 3. Plot the timeseries according to whatever criterion
 set_default_plot_size(23cm, 15cm)
-p = Gadfly.plot(dfs, x=:Time, y=:Voltage, color=:Neuron, Geom.line) 
-
-img = SVG("100mV_PLM_input.svg")
+p = Gadfly.plot(dfs, x=:Time, y=:Voltage, color=:Neuron, Geom.line)
+img = SVG("100mV_PLM_input1.svg")
 import Cairo, Fontconfig
-img = PDF("100mV_PLM_input2.pdf", 20cm,dpi=300)
+img = PDF("100mV_PLM_input0.pdf", 20cm,dpi=300)
 draw(img, p)
 display(p)
 
