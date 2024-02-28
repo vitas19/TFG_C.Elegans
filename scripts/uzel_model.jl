@@ -22,7 +22,7 @@ But Wicks et al, 1996, reports a private communication with R.E.Davis:
 """
 const E_exc = 0#mV
 const E_inh = -48#mv 
-const E_rev = -65.0 #mV, Reversal potential of the synapse (-65 mV)
+const E_rev = -65.0 #mV, Reversal potential of the synapse 
 const specific_capacitance = 1 #uF/cm2
 const intracellular_resistivity = 0.03 #kΩ*cm
 

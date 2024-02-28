@@ -225,7 +225,7 @@ If[:] .= null
 A = 5 #pA, input level for the pulse
 If[findNeuronByIndices(inputNeuronPatterns)] .= pulse(A, 5.0, 3.5)
 Ie = vectorInput(If)#This is the matrix of excitations
-# FVA: some assertions should follow.
+
 matrixInputs = mapreduce(Ie, hcat, 0.0:0.05:1.0);
 [findNeuronByIndices(inputNeuronPatterns), 1:10]
 
@@ -297,7 +297,7 @@ fieldnames(ODESolution)
 ########################################################################
 # For the plotting
 ########################################################################
-#display(Gadfly.plot(x=sol2.t,  y=sol2[focusNeuronIndices[1],1,:]', Geom.line))
+
 # 2. Get the timeseries for these neurons and create a dataframe with the ordered focussed Neuron set
 df = 
     DataFrame(
