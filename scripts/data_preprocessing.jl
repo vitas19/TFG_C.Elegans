@@ -25,7 +25,6 @@ using XLSX
 # 2 Neuronal Connectivity II: by L.R. Varshney, B.L. Chen, E. Paniagua, D.H. Hall and D.B. Chklovskii
 
 data_connect_phar = CSV.read(datadir("exp_raw","ConexionsPharyngeal.csv"), DataFrame) 
-# data_connect_phar = CSV.read("RawData/ConexionsPharyngeal.csv", DataFrame)
 """
 Sending: Name of sending neuron
 Receiving: Name of receiving neuron
@@ -36,7 +35,6 @@ Type: Type of synapse: S: synaptic; G: gap.
 
 data_connect_neuron = DataFrame(XLSX.readtable(datadir("exp_raw","NeuronConnect.xlsx"), "Sheet1"))
 # These data come from WormAtlas in NeuronConnect.xls(x)
-# data_connect_neuron = DataFrame(XLSX.readtable("RawData/NeuronConnect.xlsx", "Sheet1"))
 """
 N1: Neuron 1 name
 N2: Neuron 2 name
@@ -56,7 +54,7 @@ It must be noted that at polyadic synaptic sites, not all “send-poly” were f
 Nbr: Number of synapses between the given neuron pair.
 """
 
-# data_type_neuron = DataFrame(XLSX.readtable("RawData/NeuronType.xlsx", "Sheet1"))
+
 data_type_neuron = DataFrame(XLSX.readtable(datadir("exp_raw","NeuronType.xlsx"), "Sheet1"))
 """
 Neuron: Name of neuron
@@ -92,7 +90,6 @@ Note:  Sum of S_Head and R_Head does not include electrical junctions (EJ), ther
                              
                                      
 data_type_phar = DataFrame(XLSX.readtable(datadir("exp_raw","NeuronType.xlsx"), "Sheet2"))
-# data_type_phar = DataFrame(XLSX.readtable("RawData/NeuronType.xlsx", "Sheet2"))
 """
 Neuron: Name of neuron
 Soma Position: Position of cell body along the AP axis of worm body. 0=tip of nose; 1=tail tip.
@@ -100,7 +97,6 @@ Soma region: Cell body position by head, mid-body, or tail region.
 """
 
 data_connect_monoamine = CSV.read(datadir("exp_raw","MonoaminesConnect.csv"), DataFrame)
-# data_connect_monoamine = CSV.read("RawData/MonoaminesConnect.csv", DataFrame)
 """
 Neuron1: Name of sending neuron
 Neuron2: Name of receiving neuron
@@ -111,7 +107,6 @@ Specific: The specific type of monoamine
 
 
 data_connect_neuropep = CSV.read(datadir("exp_raw","NeuropeptidesConnect.csv"), DataFrame)
-# data_connect_neuropep = CSV.read("RawData/NeuropeptidesConnect.csv", DataFrame)
 """
 Neuron1: Name of sending neuron
 Neuron2: Name of receiving neuron
@@ -121,7 +116,6 @@ Type2: Another neuropeptide
 
 
 neurotransmitter = DataFrame(XLSX.readtable(datadir("exp_raw","Neurotransmitters.xlsx"), "Sheet1"))
-# neurotransmitter = DataFrame(XLSX.readtable("RawData/Neurotransmitters.xlsx", "Sheet1"))
 """These tables originate from a set of tables found in Pereira et al., 2015 
 (http://elifesciences.org/content/4/e12432v2), combined with information compiled in Loer & Rand,
 2016 & 2022, WormAtlas, and  from Gendrel et al., 2016 and Serrano-Saiz et al., 2017.						
@@ -130,23 +124,6 @@ Neuron: Name of the neuron
 Neurotransmitter1: Main neurotransmitter
 Neurotransmitter2: If the nueron sends another neurotransmitter it is stated here
 """
-
-
-# From Varshney et al, 2011.
-# Results.
-# A new wiring diagram
-# The C. elegans nervous system contains 302 neurons and is divided into
-# the pharyngeal nervous system containing 20 neurons and the somatic
-# nervous system containing 282 neurons. We updated the wiring diagram
-# (see Methods) of the larger somatic nervous system. Since neurons
-# CANL/R and VC06 do not make synapses with other neurons, we restrict
-# our attention to the remaining 279 somatic neurons.
-# The wiring diagram consists of
-# - 6393 chemical synapses,
-# - 890 gap junctions, and
-# - 1410 neuromuscular junctions.
-
-
 
 
 
@@ -160,17 +137,6 @@ Value: either 0mV is excitatory or -48mV if inhibitory
 """
 
 
-""" IMPORTANT VARIABLES: the DataFrames read in
-1. data_connect_phar
-2. data_connect_neuron
-3. data_type_neuron
-4. data_type_phar
-5. data_connect_monoamine
-6. data_connect_neuropep
-7. neurotransmitter"""
-
-
-
 #%% DATA FRAMES AND CLEANING
 println("DATAFRAMES CLEANING")
 # GAP AND SYNAPTIC
@@ -182,9 +148,7 @@ data_type = vcat(data_type_phar, data_type_neuron)
 push!(data_type,["CANL", 0.61, "M"])
 push!(data_type,["CANR", 0.61, "M"])
 # Sort the dataframe by the position of the neuron in the soma
-data_type_sort_soma = sort!(data_type, [:"Soma Position"])
-# FVA: maybe it would be advisable to sort here also wrt distance from the tip?
-# Q: Is this what the SomaPosition means roughly                            
+data_type_sort_soma = sort!(data_type, [:"Soma Position"])                          
 # Add a column to know for the future the number of the neuron
 data_type_sort_soma.Place = 1:302
 

@@ -1,5 +1,5 @@
 # KUNERT MODEL 
-include("data_preprocessing.jl") 
+#include("data_preprocessing.jl") 
 include("plots.jl")
 using Plots
 using OrdinaryDiffEq
@@ -7,8 +7,9 @@ using TimerOutputs
 using Gadfly
 using Chain
 using LinearAlgebra
-# Constants 
+using MAT
 
+# Constants 
 " Number of neurons in the Celegans connectome."
 const nNeurons = 302
 
@@ -23,8 +24,6 @@ But Wicks et al, 1996, reports a private communication with R.E.Davis:
 const E_exc = 0#mV
 const E_inh = -48#mv 
 const E_rev = -65.0 #mV, Reversal potential of the synapse (-65 mV)
-
-const spikeThresh = 0 #mV Spiking threshold?????
 const specific_capacitance = 1 #uF/cm2
 const intracellular_resistivity = 0.03 #kΩ*cm
 
@@ -82,7 +81,6 @@ M1 = Diagonal(fill(-Gc, nNeurons))
 
 # M2 computation:
 M2 = Diagonal(-gᵞ * vec(sum((gᵞ * gap_number), dims=2)))
-#@assert isless(vec(sum(gapJunctionConnectome, dims=2)) - gapJunctionConnectome * ones(nNeurons), fill(eps(Float64), nNeurons))
 
 # M3 computation:
 s_eq = ar / (ar + 2 * ad)       # Formula to compute the synaptic activity in eq# uilibrium (is obtained by imposing dsi/dt=0 and synaptic activation Φ = 1/2 in Kunert equations)
@@ -99,7 +97,7 @@ Ej = [neurotrans == "GABA" || neurotrans == "Dopamine" ? -48 : 0 for neurotrans 
 b3 = gᵞ * (s_eq * Ej)   # 1D vector of size N × 1 
 
 """
-Excitatory current for sensory experiment on CO2 sensing on BAG in C.elegans. In mV(?)
+Excitatory current for sensory experiment on CO2 sensing on BAG in C.elegans.
 """
 Iext = zeros(nNeurons);#zero-input condition
 
@@ -129,45 +127,30 @@ histogram!(size=(1500,500))
 
 
 ###############################################################################
-# Model 1 using naked Dif Equations
+# Using naked Dif Equations
 
 ##############################################################################
 
 # Define the derivatives of the states with respect to time for each neuron.
 # - u is the neuron voltage
 # - i is the neuron activation state/level
-# all constants imported from Celegans.Constants
 Gᵞ = gᵞ * gap_number #The matrix of GJ conductances
 
 Sᵞ = gᵞ * synaptic_number #Matrix of Synaptic conductances
 EJ = repeat(Ej',nNeurons,1) #Same ROW is the same
 spy(EJ)
 @assert all(vec(EJ[rand(1:nNeurons),:] .== EJ[rand(1:nNeurons),:]))
-#typeof(EJ[rand(1:nNeurons),:] .== EJ[rand(1:nNeurons),:])
+
 function derivatives(nStates, p, t)
-    #dv = (-Gc * (nStates[:, 1] - Ecell) - eq_IiGap[1] - eq_IiSyn[1] +  ) / C
-    allV = repeat(nStates[:,1],1,nNeurons)#Makes the space for it. 
-    dv = (-Gc * (nStates[:, 1] .- Ecell) #- eq_IiGap[1]
+    allV = repeat(nStates[:,1],1,nNeurons) #Makes the space for it. 
+    dv = (-Gc * (nStates[:, 1] .- Ecell) 
           -  (sum( Gᵞ .* (allV - allV'), dims=2))
-          -  ( Sᵞ .* (allV - EJ)) * nStates[:, 2]) ./ C  #- eq_IiSyn[1] +  ) / C
+          -  ( Sᵞ .* (allV - EJ)) * nStates[:, 2]) ./ C  
     di = ar * (1 ./ (1 .+ exp.(-beta * (nStates[:, 1] .- Vth)))) .* (1 .- nStates[:, 2]) .- ad * nStates[:, 2]
   return hcat(dv,di)
 end
 
-"""
-In place derivative function for the easier solvers.
 
-- Note: excitations Iₑ have are encoded here as a current vector for each neuron
-@example
-S = zeros(nNeurons,2)
-dS = zeros(nNeurons,2)
-Iₑ = Ie #see below
-#Iₑ = Array{Any}(undef,nNeurons);
-#null = t -> 0.0
-#Iₑ[:] .= null
-#Iₑ = t -> sin(t)
-t = 0.010
-"""
 function celegansChangeState!(dS, S, Iₑ, t)
     allV = repeat(S[:,1],1,nNeurons);#Makes the space for it. 
     dS[:,1] .= (-Gc * (S[:, 1] .- Ecell) 
@@ -181,7 +164,7 @@ end
 
 """
 A curried function for two parameters takes:
-- fVector:a list of functions of time (WARNING!: Unchecked!)
+- fVector:a list of functions of time 
 - t:a time instant
 and evaluates all the functions, returning a vector of the same length
 """
@@ -189,7 +172,7 @@ vectorInput = fVector ->
     function(t)
         return([f(v) for (f, v) in zip(fVector,fill(t,size(fVector)))])
     end
-#vectorInput("hello")(1.0)
+
 
 """
         null(t)
@@ -211,17 +194,13 @@ pulse = function(A,D,τ)
     end
 end
 
-pulse(20.0, 1.0, 0.5)(-0.01)
-pulse(20.0, 1.0, 0.5)(0.0)
-pulse(20.0, 1.0, 0.5)(0.5)
-pulse(20.0, 1.0, 0.5)(1.5)
 
 
 # 5.1. Put together a dataframe with the timeseries of the affected neurons
 # Experiment from Kunert, Shlizerman and Kutz, 2014
 # 1. Get the neuron names of some given neuron name patterns.
 inputNeuronPatterns = ["PLM"]
-outputNeuronPatterns = ["AVA", "AVB", "AVD", "AVE", "PVC"]
+outputNeuronPatterns = ["RIM", "AIY", "AFD", "AWA"]
 focusNeuronPatterns =  vcat(inputNeuronPatterns, outputNeuronPatterns)
 
 
@@ -239,21 +218,18 @@ neuronIndices = findNeuronByIndices(focusNeuronPatterns)
 
 
 """
-Example vector of excitation functions for an experiment.
+Vector of excitation functions for an experiment.
 """
 If = Array{Function}(undef,nNeurons);
 If[:] .= null
-A = 100.0#pA, input level for the pulse
-If[findNeuronByIndices(inputNeuronPatterns)] .= pulse(A, 1.0, 0.5)
+A = 5 #pA, input level for the pulse
+If[findNeuronByIndices(inputNeuronPatterns)] .= pulse(A, 5.0, 3.5)
 Ie = vectorInput(If)#This is the matrix of excitations
 # FVA: some assertions should follow.
 matrixInputs = mapreduce(Ie, hcat, 0.0:0.05:1.0);
 [findNeuronByIndices(inputNeuronPatterns), 1:10]
 
-# dState = ODEFunction{true}(
-#     derivatives;
-#     syms=repeat(neuron_list.Neuron, 1,2)
-# )
+
 dStateIIP = ODEFunction{true}(
     celegansChangeState!;
     syms=repeat(data_type_sort_soma.Neuron, 1,2)    
@@ -268,9 +244,7 @@ TEST = true
 nState - Neuron voltage in column 1 and activation state of synapses in 2.
 """
 nStates = zeros(nNeurons, 2)
-# if !TEST#set the states already in their equilibrium
-#     nStates[:,2] = Vth#Let's place the synapses in their original activation
-# end
+
 
 """
 For the worm we use:
@@ -283,10 +257,8 @@ if !TEST
 else
     tspan = (0.0, 30.0)#only for half a minute.
 end
-tspan = (0.0, 2.0)#for inputs lasting like a minute.
-#tspan = (0.0, 0.5)#for inputs lasting like a minute.
-# gusano1 = ODEProblem(dState, nStates, tspan)#Not working
-# sol1 = solve(gusano1)
+tspan = (0.0, 10)#for inputs lasting like a minute.
+
 gusano2 =
     ODEProblem(celegansChangeState!,#dStateIIP,
                nStates,
@@ -298,7 +270,7 @@ fieldnames(ODEProblem)
 
 """
         algo - the algorithm for solving the ODE
-In DifferentialEquations.jl, some good “go-to” choices for ODEs are:
+In DifferentialEquations.jl, some ODEs are:
 
 * AutoTsit5(Rosenbrock23()) handles both stiff and non-stiff equations. This is a good algorithm to use if you know nothing about the equation.
 * AutoVern7(Rodas5()) handles both stiff and non-stiff equations in a way that's efficient for high accuracy.
@@ -311,7 +283,6 @@ In DifferentialEquations.jl, some good “go-to” choices for ODEs are:
 * QNDF() for large stiff equations
     """
 timestep = 0.02# 20ms to sample at a rate of 50Hz
-#algo = KenCarp4()#Is this too demandind?
 algo = Tsit5()
 
 sol2 = @time "solve worm" solve(gusano2, algo;
@@ -323,19 +294,6 @@ sol2 = @time "solve worm" solve(gusano2, algo;
 fieldnames(ODESolution)
 
 # Plot the results of the simulation.
-# TODO: tspan must be transformed to the time scale
-########################################################################
-# using Plots
-########################################################################
-# gr()
-# focusNeuronPattern = "BAG"
-# focusNeuronIndices =
-#     findall(map(x -> str_detect(x, focusNeuronPattern), newNameByIndex))
-# focusNeurons = newNameByIndex[focusNeuronIndices]
-# #sol[2, 1, :], is the timeseries for the component, which is the 2nd row and 1 column.
-# sol2[focusNeuronIndices[1],1,:]
-# display(plot(sol2.t, sol2[focusNeuronIndices,1,:]'))
-
 ########################################################################
 # For the plotting
 ########################################################################
@@ -353,26 +311,49 @@ df =
 df[!, "Time"] = sol2.t;#Adding the time as an independent criterion
 describe(df)
 
-#dfs = stack(df, newNameByIndex[neuronIndices], "Time");
 dfs = @chain stack(df, Not("Time")) begin
     rename(:variable => :Neuron, :value => :Voltage)
 end
 
 show(dfs, allrows = true)
 
-
 # 3. Plot the timeseries according to whatever criterion
 set_default_plot_size(23cm, 15cm)
 p = Gadfly.plot(dfs, x=:Time, y=:Voltage, color=:Neuron, Geom.line) 
-
-img = SVG("100mV_PLM_input.svg")
-import Cairo, Fontconfig
-img = PDF("100mV_PLM_input2.pdf", 20cm,dpi=300)
-draw(img, p)
 display(p)
 
-"""
-println("4. Environment description")
-using Pkg;Pkg.status()
-exit(0)
-"""
+# Split the original DataFrame into each neuron
+neuron_evolution = groupby(dfs, :Neuron)
+
+for i in 1:10
+    # Number of rows to move down
+    num_rows_to_move = 20
+
+    # Move existing rows 20 positions downwards and sum 1.0 second to each Time value
+    neuron_evolution[i][1:(end - num_rows_to_move), :Time] .+= 0.38
+
+    # Define the constant voltage for the new rows
+    constant_voltage = resting_states[i, :RestingValue]
+
+    # Create a DataFrame for the new rows
+    new_rows = DataFrame(
+        Time = 0.0:0.02:(num_rows_to_move * 0.02 - 0.02),
+        Neuron = repeat([resting_states[i, :Neuron]], num_rows_to_move),
+        Voltage = fill(constant_voltage, num_rows_to_move)
+    )
+
+    # Concatenate the new rows with the updated DataFrame
+    df = vcat(new_rows, neuron_evolution[i])
+
+    # Print the updated DataFrame
+    println(df)
+
+
+
+    p = Gadfly.plot(df, x=:Time, y=:Voltage, color=:Neuron, Geom.line)
+
+    display(p)
+
+end
+
+

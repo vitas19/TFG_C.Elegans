@@ -96,7 +96,7 @@ savefig(plotsdir("mono_conn.png"))
 
 
 
-"Plot the connections by Neuropeptides (FALTA SABER QUE SIGNIFICA CADA COLUMNA)"
+"Plot the connections by Neuropeptides"
 # Create one matrix for each column of the dataframe
 neuropep_connections_Type1 = zeros(302,302)
 neuropep_connections_Type2 = zeros(302,302)
